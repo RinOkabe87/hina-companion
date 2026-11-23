@@ -1,0 +1,3 @@
+[submodule "tools/mesh-avatar-studio"]
+	path = tools/mesh-avatar-studio
+	url = https://github.com/shinshin86/mesh-avatar-studio.git

@@ -1,0 +1,45 @@
+# Python environments and generated files
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local companion state and private data
+hina_memory.db
+hina_memory.db-shm
+hina_memory.db-wal
+hina_chroma/
+hina_soul.json
+appdata/
+voice_cache/
+models/
+
+# Download and package caches
+uv-cache/
+npm-cache/
+.cache/
+
+# Local model weights and installers
+kokoro-v1.0.onnx
+voices-v1.0.bin
+*.onnx
+torch-*.whl
+torchvision-*.whl
+
+# Private avatar and generated voice media
+hina_face*.jpg
+hina_voice.mp3
+hina_voice.wav
+
+# Local configuration and logs
+.env
+.env.*
+!.env.example
+*.log
+*.tmp
+Thumbs.db
+.DS_Store

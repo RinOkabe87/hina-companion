@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>Hina</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: "Segoe UI", sans-serif;
+        background: #090b12;
+        color: #eef1f8;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        min-height: 100vh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+        padding: 28px;
+        background:
+          radial-gradient(ellipse at 75% 20%, #202b45 0, transparent 38%),
+          radial-gradient(ellipse at 15% 90%, #25192d 0, transparent 36%),
+          #090b12;
+      }
+
+      main {
+        width: min(1120px, 100%);
+        min-height: min(720px, calc(100vh - 56px));
+        display: grid;
+        grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1fr);
+        overflow: hidden;
+        border: 1px solid #ffffff1a;
+        border-radius: 28px;
+        background: #111521d9;
+        box-shadow: 0 30px 100px #0008;
+      }
+
+      .portrait {
+        display: grid;
+        place-items: center;
+        min-height: 540px;
+        padding: 24px;
+        background: linear-gradient(155deg, #1a2030, #10131d 72%);
+      }
+
+      mesh-avatar {
+        display: block;
+        width: min(100%, 430px);
+        height: min(680px, calc(100vh - 104px));
+        border-radius: 18px;
+        overflow: hidden;
+      }
+
+      .conversation {
+        display: flex;
+        flex-direction: column;
+        min-height: 540px;
+        padding: clamp(24px, 5vw, 56px);
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding-bottom: 28px;
+        border-bottom: 1px solid #ffffff17;
+      }
+
+      .orb {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #83d9ff;
+        box-shadow: 0 0 20px #83d9ff99;
+      }
+
+      .orb.speaking {
+        background: #d6a5ff;
+        box-shadow: 0 0 22px #d6a5ffcc;
+      }
+
+      h1 { margin: 0; font-size: 1.25rem; letter-spacing: 0.16em; }
+      #status { margin: 5px 0 0; color: #9da8bd; font-size: 0.85rem; }
+
+      .message {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 16px;
+        padding: 32px 0;
+      }
+
+      #speaker {
+        margin: 0;
+        color: #aeb8ce;
+        font-size: 0.8rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      #text {
+        margin: 0;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        font-size: clamp(1.15rem, 2.2vw, 1.6rem);
+        line-height: 1.65;
+      }
+
+      footer {
+        padding-top: 20px;
+        border-top: 1px solid #ffffff17;
+        color: #7f8ba2;
+        font-size: 0.82rem;
+        line-height: 1.5;
+      }
+
+      @media (max-width: 760px) {
+        body { padding: 12px; }
+        main { grid-template-columns: 1fr; }
+        .portrait { min-height: auto; padding: 14px; }
+        mesh-avatar { width: min(74vw, 350px); height: min(52vh, 500px); }
+        .conversation { min-height: 300px; padding: 24px; }
+        .message { padding: 24px 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="portrait" aria-label="Hina's avatar">
+        <mesh-avatar id="avatar" src="/avatar/" label="Hina avatar"></mesh-avatar>
+      </section>
+      <section class="conversation" aria-live="polite">
+        <header>
+          <span id="orb" class="orb" aria-hidden="true"></span>
+          <div>
+            <h1>HINA</h1>
+            <p id="status">Connecting to Hina…</p>
+          </div>
+        </header>
+        <div class="message">
+          <p id="speaker">Hina</p>
+          <p id="text">Your local companion is getting ready.</p>
+        </div>
+        <footer>Voice input stays in Hina's console. Conversation text is remembered locally; audio is not saved.</footer>
+      </section>
+    </main>
+    <script type="module">
+      import '/mesh-avatar.js';
+
+      const avatar = document.querySelector('#avatar');
+      const speaker = document.querySelector('#speaker');
+      const text = document.querySelector('#text');
+      const status = document.querySelector('#status');
+      const orb = document.querySelector('#orb');
+      let speechId = null;
+      let speechStart = 0;
+      let speechDuration = 0;
+      let voiceEnvelope = [];
+      let speaking = false;
+
+      avatar.addEventListener('load', () => {
+        status.textContent = 'Ready · listening through Hina’s microphone';
+      });
+      avatar.addEventListener('error', event => {
+        status.textContent = `Avatar failed to load: ${event.detail.error.message}`;
+      });
+
+      async function refresh() {
+        try {
+          const response = await fetch('/api/state', { cache: 'no-store' });
+          if (!response.ok) throw new Error(`Local UI returned ${response.status}`);
+          const state = await response.json();
+          speaker.textContent = state.speaker || 'Hina';
+          text.textContent = state.text || 'Say something to Hina in the console.';
+          if (avatar.emotion !== state.emotion) avatar.emotion = state.emotion || 'neutral';
+          if (state.speaking && state.speech_id !== speechId) {
+            speechId = state.speech_id;
+            speechStart = performance.now() - state.speech_elapsed * 1000;
+            speechDuration = state.speech_duration * 1000;
+            voiceEnvelope = state.voice_envelope || [];
+          }
+          speaking = state.speaking;
+          avatar.avatar?.setSpeaking(speaking);
+          status.textContent = state.status || 'Ready';
+          if (speaking) {
+            orb.classList.add('speaking');
+          } else {
+            orb.classList.remove('speaking');
+            avatar.setVoiceLevel(0);
+          }
+        } catch (error) {
+          status.textContent = `Local connection lost: ${error.message}`;
+          speaking = false;
+          voiceEnvelope = [];
+          avatar.avatar?.setSpeaking(false);
+          avatar.setVoiceLevel(0);
+          orb.classList.remove('speaking');
+        }
+      }
+
+      function animate() {
+        if (speaking) {
+          const elapsed = performance.now() - speechStart;
+          const frame = Math.max(0, elapsed / 30);
+          const index = Math.floor(frame);
+          const start = voiceEnvelope[index] || 0;
+          const end = voiceEnvelope[index + 1] || 0;
+          const level = start + (end - start) * (frame - index);
+          avatar.setVoiceLevel(elapsed < speechDuration ? level : 0);
+        }
+        requestAnimationFrame(animate);
+      }
+
+      await avatar.ready.catch(error => {
+        status.textContent = `Avatar failed to load: ${error.message}`;
+      });
+      await refresh();
+      window.setInterval(refresh, 180);
+      requestAnimationFrame(animate);
+    </script>
+  </body>
+</html>
